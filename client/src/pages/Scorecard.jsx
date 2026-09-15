@@ -106,39 +106,75 @@ function TeamGrid({ team, cycle, isLead, isStakeholder, onSaved, readOnly, every
   const rowKey = (row) => (row.row_id ? `r${row.row_id}` : `u${row.user_id}`);
   const key = (row, fieldId) => `${rowKey(row)}:${fieldId}`;
 
-  // Reload the grid from the server whenever the month or the data changes.
+  // Boxes typed in but not yet saved, and the timer that will save each one.
+  const pending = useRef({});
+  const timers = useRef({});
+
+  // Reload the grid from the server whenever the month or the data changes,
+  // without overwriting a box somebody is in the middle of typing into.
   useEffect(() => {
-    const next = {};
-    for (const row of team.rows) {
-      for (const [fieldId, v] of Object.entries(row.values)) {
-        next[key(row, fieldId)] = { ...v };
+    setValues((current) => {
+      const next = {};
+      for (const row of team.rows) {
+        for (const [fieldId, v] of Object.entries(row.values)) {
+          const k = key(row, fieldId);
+          next[k] = pending.current[k] ? current[k] : { ...v };
+        }
       }
-    }
-    setValues(next);
+      return next;
+    });
   }, [team, cycle]);
 
-  const edit = (row, fieldId, which) => (e) => {
-    const k = key(row, fieldId);
-    setValues((s) => ({ ...s, [k]: { ...s[k], [which]: e.target.value } }));
-  };
+  /** Sends one box. Returns quietly if it already matches what the server has. */
+  const save = async (k, { keepalive = false, andRefresh = false } = {}) => {
+    const item = pending.current[k];
+    if (!item) return;
+    delete pending.current[k];
+    clearTimeout(timers.current[k]);
+    delete timers.current[k];
 
-  const commit = (row, fieldId) => async () => {
-    const k = key(row, fieldId);
-    const cell = values[k] || { target: '', achieved: '' };
+    const { row, fieldId, cell } = item;
     const original = row.values[fieldId] || { target: '', achieved: '' };
     if (cell.target === original.target && cell.achieved === original.achieved) return;
     try {
       await api.saveCell({
         cycle, row_id: row.row_id, user_id: row.user_id, field_id: Number(fieldId), ...cell,
-      });
+      }, { keepalive });
       setFlash((s) => ({ ...s, [k]: 'ok' }));
       setTimeout(() => setFlash((s) => ({ ...s, [k]: undefined })), 1400);
-      onSaved?.();
+      if (andRefresh) onSaved?.();
     } catch (e) {
       setError(e.message);
       setFlash((s) => ({ ...s, [k]: 'bad' }));
     }
   };
+
+  // Typing saves on its own after a short pause, so nothing is lost by staying
+  // in the box, reloading, or closing the tab.
+  const edit = (row, fieldId, which) => (e) => {
+    const k = key(row, fieldId);
+    const cell = { ...(values[k] || { target: '', achieved: '' }), [which]: e.target.value };
+    setValues((s) => ({ ...s, [k]: cell }));
+    pending.current[k] = { row, fieldId, cell };
+    clearTimeout(timers.current[k]);
+    timers.current[k] = setTimeout(() => save(k), 600);
+  };
+
+  /** Clicking away or pressing Enter saves at once. */
+  const commit = (row, fieldId) => () => save(key(row, fieldId), { andRefresh: true });
+
+  // A reload or a closed tab still gets whatever was typed a moment ago.
+  useEffect(() => {
+    const flush = () => Object.keys(pending.current).forEach((k) => save(k, { keepalive: true }));
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHide);
+      flush();
+    };
+  }, [cycle]);
 
   /** Another blank line under the same name — nothing to name or label. */
   const addRow = async (row) => {

@@ -3,7 +3,7 @@ const TOKEN_KEY = 'mpt.token';
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 
-async function request(path, { method = 'GET', body, raw } = {}) {
+async function request(path, { method = 'GET', body, raw, keepalive } = {}) {
   const headers = {};
   const token = getToken();
   if (token) headers.authorization = `Bearer ${token}`;
@@ -12,6 +12,8 @@ async function request(path, { method = 'GET', body, raw } = {}) {
   const res = await fetch(`/api${path}`, {
     method,
     headers,
+    // keepalive lets a save finish even if the page is being closed or reloaded
+    keepalive: !!keepalive,
     body: raw ? body : body ? JSON.stringify(body) : undefined,
   });
 
@@ -43,7 +45,7 @@ export const api = {
   // The monthly sheet: columns per team, and a target/achieved cell per person.
   scorecard: (cycle) => request(`/scorecard${qs({ cycle })}`),
   review: (cycle) => request(`/review${qs({ cycle })}`),
-  saveCell: (b) => request('/scorecard/cell', { method: 'PUT', body: b }),
+  saveCell: (b, opts) => request('/scorecard/cell', { method: 'PUT', body: b, keepalive: opts?.keepalive }),
   addRow: (b) => request('/scorecard/rows', { method: 'POST', body: b }),
   deleteRow: (id) => request(`/scorecard/rows/${id}`, { method: 'DELETE' }),
   addField: (b) => request('/scorecard/fields', { method: 'POST', body: b }),
