@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import db from './db.js';
+import { one } from './db.js';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'cloudfuze-marketing-performance-tracker-local-dev';
 
@@ -14,16 +14,16 @@ export function publicUser(u) {
 }
 
 /** Attaches req.user when a valid bearer token is present. */
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'Not signed in' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(payload.id);
+    const user = await one('SELECT * FROM users WHERE id = $1 AND active', [payload.id]);
     if (!user) return res.status(401).json({ error: 'Account no longer active' });
     req.user = publicUser(user);
-    next();
+    return next();
   } catch {
     return res.status(401).json({ error: 'Session expired, please sign in again' });
   }
@@ -34,7 +34,7 @@ export function requireLead(req, res, next) {
   if (req.user?.role !== 'lead') {
     return res.status(403).json({ error: 'Only the marketing lead can do this' });
   }
-  next();
+  return next();
 }
 
 /** Anyone who can change data: lead or member (stakeholders are read-only). */
@@ -42,7 +42,7 @@ export function requireWriter(req, res, next) {
   if (req.user?.role === 'stakeholder') {
     return res.status(403).json({ error: 'Stakeholder access is read-only' });
   }
-  next();
+  return next();
 }
 
 export const isLead = (req) => req.user?.role === 'lead';

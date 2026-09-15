@@ -2,6 +2,12 @@ node_modules/
 dist/
 server/uploads/*
 !server/uploads/.gitkeep
+# the old SQLite store, kept only for importing into Postgres
 server/data.db
 server/data.db-shm
 server/data.db-wal
+
+# secrets — connection strings live here
+.env
+server/.env
+client/.env

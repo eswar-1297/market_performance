@@ -1,33 +1,34 @@
 # Render blueprint — https://render.com/docs/blueprint-spec
 #
-# One web service: the API, which also serves the built React app, so there is
-# a single URL and no CORS to think about.
+# A Postgres database, and one web service that serves both the API and the
+# built React app, so there is a single URL and no CORS to think about.
 #
-# The sheet lives in a SQLite file, so it needs somewhere that survives a
-# redeploy. That is what the disk below is for, and a disk needs a paid
-# instance type. To try it for free first, delete the `disks:` block and set
-# `plan: free` — everything works, but the sheet resets every time the service
-# restarts or sleeps.
+# The data lives in Postgres, so the web service can be free: a free instance
+# sleeps when idle and restarts cold, but nothing is lost when it does.
+
+databases:
+  - name: marketing-sheet
+    plan: free
+    databaseName: marketing
+    user: marketing
 
 services:
   - type: web
     name: marketing-performance
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     branch: main
-    buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci
-    # seed runs only on an empty database; restructure only fixes what has drifted
+    buildCommand: cd client && npm ci && npm run build && cd ../server && npm ci --omit=dev
+    # seed only fills an empty database; restructure only fixes what has drifted
     startCommand: cd server && npm run deploy
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: DATA_DIR
-        value: /var/data
       - key: JWT_SECRET
         generateValue: true
-    disks:
-      - name: sheet-data
-        mountPath: /var/data
-        sizeGB: 1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: marketing-sheet
+          property: connectionString

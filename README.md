@@ -12,23 +12,41 @@ Teams, people and the starter columns come from the team's own spreadsheet and t
 
 ## Running it
 
-Double-click **`start.bat`**, or run the two halves yourself:
+The data lives in Postgres. Point the server at one, then start the two halves.
+
+**First time on a machine** — creates the database and writes `server/.env`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup-db.ps1
+```
+
+It asks for the password of the local PostgreSQL `postgres` account. Forgotten it?
+`reset-postgres-password.ps1`, from an admin PowerShell, sets a new one. Using a database
+somewhere else instead — Render, Neon, Supabase — paste its connection string into:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup-db.ps1 -Remote
+```
+
+Either way `server/.env` ends up holding one line of `DATABASE_URL=postgres://…` and a
+generated `JWT_SECRET`. It is gitignored.
+
+**Then:**
 
 ```bash
-# terminal 1 — API + database
 cd server
 npm install        # first run only
-npm run seed       # first run only
+npm run seed       # first run only — teams, people and the starter columns
 npm start          # http://localhost:4100
 
-# terminal 2 — UI in dev mode (hot reload)
 cd client
 npm install        # first run only
-npm run dev        # http://localhost:5180
+npm run dev        # http://localhost:5180, hot reload while working on the UI
 ```
 
 For everyday use just run `npm run build` in `client/` once — the server then serves the
-built UI itself, so **http://localhost:4100** is the only address anyone needs.
+built UI itself, so **http://localhost:4100** is the only address anyone needs. Or
+double-click **`start.bat`**.
 
 ### Sign in
 
@@ -175,18 +193,22 @@ wanted back; otherwise it is simply inert.
 
 ## Technical notes
 
-- **Backend** — Node 22 + Express, SQLite via `better-sqlite3`, JWT auth, bcrypt password
-  hashing. Database file: `server/data.db`.
+- **Backend** — Node 22 + Express, Postgres via `pg`, JWT auth, bcrypt password hashing.
+  Connection string in `DATABASE_URL`; the tables are created on boot if they are missing.
 - **Frontend** — React 18 + Vite + React Router. No CSS framework, no chart library.
 - **Scoring** — one function, `scoreCell` in `server/src/routes/scorecard.js`, feeds both the
   review endpoint and anything built on it later, so the UI never second-guesses a verdict.
-- **The sheet** — three tables. `scorecard_fields` is one row per team column (with its
-  `direction`); `scorecard_rows` is one row per line of the sheet — a person plus an optional
-  label, unique on `(user_id, label)`, so the shape carries across months; `scorecard_cells`
-  holds `target` and `achieved` as text, unique on `(cycle, row_id, field_id)`. A person's
-  unlabelled row is written the first time something is typed on it, so an untouched sheet
-  stores nothing. The starter columns are inserted once, only when `scorecard_fields` is empty,
-  so nothing ever overwrites the lead's edits.
+- **The sheet** — three tables. `scorecard_fields` is one column of a team's sheet, with the
+  heading it sits under (`group_name`) and which way is good (`direction`); `scorecard_rows` is
+  one line — a person, optionally on another team's sheet, and optionally one of several lines
+  for that person, so the shape carries across months; `scorecard_cells` holds `target` and
+  `achieved` as text, unique on `(cycle, row_id, field_id)`. A person's first row is written the
+  first time something is typed on it, so an untouched sheet stores nothing. The starter columns
+  are inserted once, only when `scorecard_fields` is empty, so nothing ever overwrites the
+  lead's edits.
+- **Moving from the old SQLite version** — `npm run import-sqlite` copies teams, people (with
+  their passwords), columns, rows and every filled-in box out of a `data.db` and into Postgres.
+  It matches on names and emails, so running it twice updates rather than duplicates.
 - **Months** — a month exists as soon as someone types in it; the month list is built from the
   cells themselves, so the review can only offer months that have something in them.
 - **Port** — the API runs on **4100** (4000 was already taken on this machine). Override with
@@ -197,42 +219,49 @@ wanted back; otherwise it is simply inert.
 
 ## Putting it online (Render)
 
-The repo carries a `render.yaml`, so Render can set the whole thing up itself.
+The repo carries a `render.yaml`, so Render can set the whole thing up itself: a Postgres
+database and one web service that serves both the API and the built UI.
 
 1. Push this repo to GitHub.
 2. In Render: **New → Blueprint**, pick the repo, and it reads `render.yaml`.
-3. Approve the plan and deploy. First boot seeds the teams, members and columns,
-   so the sheet is ready to fill in.
-4. Sign in with `jyothi@cloudfuze.com` / `Cloudfuze@123` and **change that password**
-   under *My Account* — the repo is public and that password is in this file.
+3. Approve the plan and deploy. First boot creates the tables and seeds the teams, the people
+   and the columns, so the sheet is ready to fill in.
+4. Sign in with `jyothi@cloudfuze.com` / `Cloudfuze@123` and **change that password** under
+   *My Account* — the repo is public and that password is in this file.
 
 What the blueprint sets up:
 
 | | |
 |---|---|
-| Build | `cd client && npm ci && npm run build && cd ../server && npm ci` |
+| Database | `marketing-sheet`, Postgres, free plan |
+| Build | `cd client && npm ci && npm run build && cd ../server && npm ci --omit=dev` |
 | Start | `cd server && npm run deploy` — seeds an empty database, fixes the layout, then serves |
 | Health check | `/api/health` |
-| `DATA_DIR` | `/var/data`, a 1 GB disk, so the sheet survives redeploys |
-| `JWT_SECRET` | generated by Render; sign-ins stay valid across restarts |
+| `DATABASE_URL` | wired to the database automatically |
+| `JWT_SECRET` | generated by Render |
 
-**The disk is the part that matters.** Everything anyone types lives in
-`$DATA_DIR/data.db`. A disk needs a paid instance type (Starter). To try it free
-first, delete the `disks:` block and set `plan: free` — it runs, but the sheet is
-wiped whenever the service restarts or wakes from sleep.
+Both the service and the database are on free plans. A free web service sleeps when idle and
+restarts cold, which costs a few seconds on the next visit — nothing is lost, because the data
+is in Postgres rather than on the instance.
 
-To take a copy of the live sheet, open the Render shell and download
-`/var/data/data.db`; to seed the deployment from your local one, upload that file
-to the same path and restart.
+**Render's free Postgres expires after 30 days.** When it does, create a free database
+elsewhere — [Neon](https://neon.tech) does not expire — and set `DATABASE_URL` on the web
+service to its connection string. No code change, and `npm run import-sqlite` or a `pg_dump`
+carries the contents over.
+
+To work against the deployed database from this machine, run
+`setup-db.ps1 -Remote` and paste the database's external connection string.
 
 ### Back up your data
 
-Everything lives in two places — copy both:
+Everything is in Postgres, so a backup is a dump:
 
+```bash
+pg_dump "$DATABASE_URL" > marketing-backup.sql      # or the Render/Neon connection string
 ```
-server/data.db      the database
-server/uploads/     files attached under the older ticket version
-```
+
+Restore with `psql "$DATABASE_URL" < marketing-backup.sql`. Hosted providers also keep their
+own backups — Render and Neon both do daily ones.
 
 ### Start a fresh month
 
@@ -248,10 +277,8 @@ drop a column that has anything filled in under it (it says so instead).
 
 ### Reset everything
 
-`npm run reseed` in `server/` rebuilds teams, members and the starter columns from the August
-deck. Because rebuilding the teams would take the sheet with them, it **refuses to run** once
-anything has been filled in, and tells you what to do instead. If you genuinely want to throw
-the sheet away, back up `server/data.db` first, then:
+`npm run reseed` in `server/` rebuilds teams, members and the starter columns. Because rebuilding the teams would take the sheet with them, it **refuses to run** once
+anything has been filled in, and tells you what to do instead. If you genuinely want to throw the sheet away, take a dump first, then:
 
 ```bash
 node src/seed.js --force --wipe-sheet
