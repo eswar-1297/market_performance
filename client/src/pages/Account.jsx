@@ -26,24 +26,21 @@ export default function Account() {
   return (
     <div className="grid g2">
       <div className="card">
-        <header><h3>Your details</h3></header>
+        <header><h3>Shared login</h3></header>
         <div className="body">
           <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '10px 20px' }}>
-            <dt className="muted small">Name</dt><dd style={{ margin: 0, fontWeight: 600 }}>{user.name}</dd>
-            <dt className="muted small">Email</dt><dd style={{ margin: 0 }}>{user.email}</dd>
-            <dt className="muted small">Designation</dt><dd style={{ margin: 0 }}>{user.designation || '—'}</dd>
-            <dt className="muted small">Team</dt><dd style={{ margin: 0 }}>{user.team_name || '—'}</dd>
-            <dt className="muted small">Reports to</dt><dd style={{ margin: 0 }}>{user.reports_to || '—'}</dd>
-            <dt className="muted small">Access</dt><dd style={{ margin: 0 }}>{user.role}</dd>
+            <dt className="muted small">Email</dt><dd style={{ margin: 0, fontWeight: 600 }}>{user.email}</dd>
+            <dt className="muted small">Access</dt><dd style={{ margin: 0 }}>Full — everyone on the team</dd>
           </dl>
           <p className="faint small" style={{ marginBottom: 0 }}>
-            Only the marketing lead can change these. Ask them if something is wrong.
+            The whole team signs in with this one account. Changing its password changes it for
+            everybody, so tell the team the new one.
           </p>
         </div>
       </div>
 
       <form className="card" onSubmit={submit}>
-        <header><h3>Change your password</h3></header>
+        <header><h3>Change the shared password</h3></header>
         <div className="body">
           <Alert onDismiss={() => setError('')}>{error}</Alert>
           {ok && <Alert kind="ok">{ok}</Alert>}

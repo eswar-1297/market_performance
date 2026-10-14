@@ -50,32 +50,28 @@ double-click **`start.bat`**.
 
 ### Sign in
 
-Every seeded account uses the password **`Cloudfuze@123`**. Change it under *My Account*.
+The whole team uses **one shared login**:
 
-| Account | Access |
+| Email | Password |
 |---|---|
-| `jyothi@cloudfuze.com` | Marketing lead — full access |
-| `rahul@cloudfuze.com`, `pankaj@cloudfuze.com`, … | Team member |
-| `stakeholder@cloudfuze.com` | CEO / stakeholder — read-only |
+| `marketing@cloudfuze.com` | `Cloudfuze@123` |
 
-Every member's address follows `firstname@cloudfuze.com`.
+The server creates this account the first time it starts. To change the password, use *My
+Account*. This changes it for everybody. `SHARED_LOGIN_EMAIL` and `SHARED_LOGIN_PASSWORD` in
+`server/.env` (or on Render) set the address and the first password. The password variable is
+used only when the account is first created.
+
+The people on the sheet (Pankaj, Rahul, …) are records, not logins. They are still listed under
+*Members*, but they cannot sign in, and sessions they had open before the switch are signed out.
 
 ---
 
 ## Who can do what
 
-| | Lead | Member | Stakeholder |
-|---|---|---|---|
-| Fill in **target / achieved** on their own rows | ✅ | ✅ | — |
-| Fill in anyone's rows | ✅ | — | — |
-| Add or remove their own extra rows (US, UK, APAC…) | ✅ | ✅ | — |
-| Add or remove anyone's extra rows | ✅ | — | — |
-| Add, rename or remove a team's **columns** | ✅ | — | — |
-| Manage teams and members | ✅ | — | — |
-| View every month, export CSV, print the review | ✅ | ✅ | ✅ |
-
-A member writing to someone else's row is refused by the server, not just hidden in the UI —
-as is a value saved against a column that does not belong to that person's team.
+The shared login has full access. Anyone signed in can fill in any row and add or remove extra
+rows. They can add, rename or remove columns, log tasks for anyone using the *Person* picker,
+and manage teams and members. Because the login is shared, the app cannot record which
+individual made a change.
 
 ---
 
@@ -131,6 +127,23 @@ Three tiles count people tracked, boxes filled in and boxes still blank. The tea
 filter the page to one team and show how much of each grid is done, so the lead can see at a
 glance who has not filled theirs in. The name column stays put when you scroll sideways, and
 ⬇ Export gives the same grid as CSV, one block per team.
+
+### Daily Tasks — what was worked on, day by day
+
+**Daily log.** Each person records what they worked on. A task has a **date**, a **URL** (the
+blog, landing page or post itself) and a **description** of what was done, with **attachments**
+if needed. You need a URL or a description, or both. A bare `cloudfuze.com/blog/x` gets
+`https://` added. One day can hold any number of tasks. The log opens on your own entries, and
+pick whose log it is with *Person*. This browser remembers the choice, so each person picks
+their own name once.
+
+Attachments are capped at 10 MB each and are stored in Postgres, not on the server's disk, so
+they survive a Render restart. Anyone signed in can download them.
+
+**Monthly summary.** The whole month per person: days logged, tasks, URLs and attachments.
+People who logged nothing are flagged *Nothing logged*. Click a person (or **Expand all**) to
+see every URL and description they entered, by date. **⬇ Export** downloads every task for the
+month as CSV, one line each. **Print / Save as PDF** gives a handout.
 
 ### Monthly Review — the month judged, not repeated
 
@@ -226,7 +239,7 @@ database and one web service that serves both the API and the built UI.
 2. In Render: **New → Blueprint**, pick the repo, and it reads `render.yaml`.
 3. Approve the plan and deploy. First boot creates the tables and seeds the teams, the people
    and the columns, so the sheet is ready to fill in.
-4. Sign in with `jyothi@cloudfuze.com` / `Cloudfuze@123` and **change that password** under
+4. Sign in with `marketing@cloudfuze.com` / `Cloudfuze@123` and **change that password** under
    *My Account* — the repo is public and that password is in this file.
 
 What the blueprint sets up:

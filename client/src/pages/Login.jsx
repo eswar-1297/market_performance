@@ -3,7 +3,7 @@ import { api, setToken } from '../api.js';
 import { Alert, Field } from '../components/ui.jsx';
 
 export default function Login({ onSignedIn }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('marketing@cloudfuze.com');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,11 +31,11 @@ export default function Login({ onSignedIn }) {
         <Alert onDismiss={() => setError('')}>{error}</Alert>
 
         <Field label="Email">
-          <input type="email" value={email} autoFocus autoComplete="username"
-            onChange={(e) => setEmail(e.target.value)} placeholder="you@cloudfuze.com" required />
+          <input type="email" value={email} autoComplete="username"
+            onChange={(e) => setEmail(e.target.value)} placeholder="marketing@cloudfuze.com" required />
         </Field>
         <Field label="Password">
-          <input type="password" value={password} autoComplete="current-password"
+          <input type="password" value={password} autoFocus autoComplete="current-password"
             onChange={(e) => setPassword(e.target.value)} required />
         </Field>
 
@@ -44,9 +44,8 @@ export default function Login({ onSignedIn }) {
         </button>
 
         <div className="hint">
-          Seeded accounts use the password <code>Cloudfuze@123</code>.<br />
-          Marketing lead: <code>jyothi@cloudfuze.com</code><br />
-          Stakeholder (read-only): <code>stakeholder@cloudfuze.com</code>
+          The whole team signs in with one shared account:{' '}
+          <code>marketing@cloudfuze.com</code>
         </div>
       </form>
     </div>

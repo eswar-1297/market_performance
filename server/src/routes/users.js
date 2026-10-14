@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { q, one, logActivity } from '../db.js';
-import { authenticate, requireLead, signToken, publicUser } from '../auth.js';
+import crypto from 'node:crypto';
+import { authenticate, requireLead, signToken, publicUser, SHARED_EMAIL } from '../auth.js';
 
 const r = Router();
 
@@ -11,6 +12,9 @@ r.post('/auth/login', async (req, res, next) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
+    if (email !== SHARED_EMAIL) {
+      return res.status(401).json({ error: `Everyone signs in with ${SHARED_EMAIL}` });
+    }
     const user = await one('SELECT * FROM users WHERE lower(email) = $1', [email]);
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       return res.status(401).json({ error: 'Incorrect email or password' });
@@ -47,8 +51,9 @@ const SELECT_USERS = `
 r.get('/users', authenticate, async (req, res, next) => {
   try {
     const { team_id, include_inactive } = req.query;
-    const where = [];
-    const args = [];
+    // The shared login is not a person, so it is never listed.
+    const args = [SHARED_EMAIL];
+    const where = ['lower(u.email) <> $1'];
     if (team_id) { args.push(team_id); where.push(`u.team_id = $${args.length}`); }
     if (!include_inactive) where.push('u.active');
     const sql = `${SELECT_USERS} ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -61,11 +66,11 @@ r.get('/users', authenticate, async (req, res, next) => {
 r.post('/users', authenticate, requireLead, async (req, res, next) => {
   try {
     const {
-      name, email, password, role = 'member', designation = '', team_id = null, reports_to = '',
+      name, email, role = 'member', designation = '', team_id = null, reports_to = '',
     } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' });
-    }
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
+    // People do not sign in themselves; the column still wants a hash.
+    const password = req.body.password || crypto.randomBytes(24).toString('hex');
     const taken = await one('SELECT 1 FROM users WHERE lower(email) = $1', [String(email).toLowerCase()]);
     if (taken) return res.status(409).json({ error: 'A member with that email already exists' });
 

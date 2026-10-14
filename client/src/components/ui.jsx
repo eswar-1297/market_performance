@@ -98,7 +98,10 @@ export function Alert({ kind = 'error', children, onDismiss }) {
 }
 
 /** Shared file + link attachment panel, used by tasks and targets. */
-export function Attachments({ items = [], onUpload, onLink, onDelete, canEdit, api, downloadWithAuth }) {
+export function Attachments({
+  items = [], onUpload, onLink, onDelete, canEdit, api, downloadWithAuth,
+  hint = 'Images, PDF, Word, Excel, PowerPoint, CSV, ZIP · up to 25 MB each',
+}) {
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const [err, setErr] = useState('');
@@ -152,7 +155,7 @@ export function Attachments({ items = [], onUpload, onLink, onDelete, canEdit, a
           >
             {busy ? 'Uploading…' : 'Drop files here, or click to choose'}
             <div className="faint" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Images, PDF, Word, Excel, PowerPoint, CSV, ZIP · up to 25 MB each
+              {hint}
             </div>
           </div>
           <input
@@ -160,7 +163,7 @@ export function Attachments({ items = [], onUpload, onLink, onDelete, canEdit, a
             onChange={(e) => { send(e.target.files); e.target.value = ''; }}
           />
 
-          {linkOpen ? (
+          {!onLink ? null : linkOpen ? (
             <div className="card" style={{ padding: 12 }}>
               <Field label="Link (Search Console, Looker Studio, Figma, Drive…)">
                 <input placeholder="https://…" value={link.url}

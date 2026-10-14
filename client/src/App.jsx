@@ -4,6 +4,7 @@ import { api, getToken, setToken } from './api.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Review from './pages/Review.jsx';
+import Tasks from './pages/Tasks.jsx';
 import Teams from './pages/Teams.jsx';
 import Members from './pages/Members.jsx';
 import Account from './pages/Account.jsx';
@@ -13,6 +14,7 @@ export const useApp = () => useContext(AppCtx);
 
 const PAGES = {
   '/': ['Monthly Sheet', 'Target and achieved, one row per person'],
+  '/tasks': ['Daily Tasks', 'What each person worked on, and the month added up'],
   '/review': ['Monthly Review', 'The saved sheet for the month, ready to print'],
   '/teams': ['Teams', 'Rosters, columns and how much of the sheet is filled in'],
   '/members': ['Members', 'People, roles and sign-in access'],
@@ -60,6 +62,7 @@ export default function App() {
           </div>
           <nav>
             <NavLink to="/" end>📋 Monthly Sheet</NavLink>
+            <NavLink to="/tasks">🗓️ Daily Tasks</NavLink>
             <NavLink to="/review">📈 Monthly Review</NavLink>
             {isLead && (
               <>
@@ -92,6 +95,7 @@ export default function App() {
           <main className="page">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/tasks" element={<Tasks />} />
               <Route path="/review" element={<Review />} />
               <Route path="/teams" element={isLead ? <Teams /> : <Navigate to="/" replace />} />
               <Route path="/members" element={isLead ? <Members /> : <Navigate to="/" replace />} />

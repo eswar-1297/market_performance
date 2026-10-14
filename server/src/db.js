@@ -118,6 +118,35 @@ CREATE TABLE IF NOT EXISTS activity (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- What somebody worked on, one entry per piece of work on a day: the link to it
+-- (a blog, a landing page, a post) and a line on what was done.
+CREATE TABLE IF NOT EXISTS daily_tasks (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  task_date   DATE NOT NULL,
+  url         TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Files kept in the database itself, so they survive a hosted restart that
+-- would wipe the server's disk.
+CREATE TABLE IF NOT EXISTS task_attachments (
+  id            SERIAL PRIMARY KEY,
+  task_id       INTEGER NOT NULL REFERENCES daily_tasks(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  mime_type     TEXT NOT NULL DEFAULT 'application/octet-stream',
+  size_bytes    INTEGER NOT NULL DEFAULT 0,
+  data          BYTEA NOT NULL,
+  uploaded_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_user_date ON daily_tasks(user_id, task_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_date      ON daily_tasks(task_date);
+CREATE INDEX IF NOT EXISTS idx_attach_task     ON task_attachments(task_id);
 CREATE INDEX IF NOT EXISTS idx_cells_cycle ON scorecard_cells(cycle);
 CREATE INDEX IF NOT EXISTS idx_rows_user   ON scorecard_rows(user_id);
 CREATE INDEX IF NOT EXISTS idx_fields_team ON scorecard_fields(team_id);

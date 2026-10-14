@@ -385,6 +385,24 @@ input.cell.bad { background: var(--red-soft); border-color: #fecaca; }
 }
 .missblock table td { padding: 6px 10px; }
 
+
+/* ---------------------------------------------------------- daily tasks */
+
+.taskform { display: grid; grid-template-columns: 170px 1fr; gap: 0 12px; }
+.tasklist { display: flex; flex-direction: column; gap: 10px; }
+.taskitem { padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.taskurl { color: var(--brand); font-weight: 600; font-size: 13px; text-decoration: none; word-break: break-all; }
+.taskurl:hover { text-decoration: underline; }
+.taskdesc { white-space: pre-wrap; font-size: 13px; margin-top: 3px; overflow-wrap: anywhere; }
+.linkish {
+  background: none; border: none; padding: 0 2px; cursor: pointer; color: var(--brand);
+  font-size: 12px; display: inline-block;
+}
+.linkish:hover { text-decoration: underline; }
+tbody tr.expanded > td { background: var(--surface-2); padding: 4px 14px 12px 38px; }
+table.worklist td { padding: 7px 10px; vertical-align: top; border-bottom: 1px solid var(--border); }
+table.worklist tr:last-child td { border-bottom: none; }
+
 @media print {
   .sidebar, .topbar, .no-print { display: none !important; }
   body { background: #fff; }
@@ -393,6 +411,7 @@ input.cell.bad { background: var(--red-soft); border-color: #fecaca; }
 }
 
 @media (max-width: 900px) {
+  .taskform { grid-template-columns: 1fr; }
   .app { flex-direction: column; }
   .sidebar { width: 100%; flex: none; height: auto; position: static; }
   .sidebar nav { flex-direction: row; flex-wrap: wrap; }

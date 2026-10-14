@@ -3,8 +3,8 @@ const TOKEN_KEY = 'mpt.token';
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY));
 
-async function request(path, { method = 'GET', body, raw, keepalive } = {}) {
-  const headers = {};
+async function request(path, { method = 'GET', body, raw, keepalive, headers: extra } = {}) {
+  const headers = { ...extra };
   const token = getToken();
   if (token) headers.authorization = `Bearer ${token}`;
   if (body && !raw) headers['content-type'] = 'application/json';
@@ -54,6 +54,23 @@ export const api = {
   deleteField: (id) => request(`/scorecard/fields/${id}`, { method: 'DELETE' }),
   renameGroup: (b) => request('/scorecard/groups', { method: 'PUT', body: b }),
   deleteGroup: (params) => request(`/scorecard/groups${qs(params)}`, { method: 'DELETE' }),
+
+  // Daily tasks: what each person worked on, a URL and a description per entry.
+  tasks: (cycle, userId) => request(`/tasks${qs({ cycle, user_id: userId })}`),
+  createTask: (b) => request('/tasks', { method: 'POST', body: b }),
+  updateTask: (id, b) => request(`/tasks/${id}`, { method: 'PUT', body: b }),
+  deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  uploadAttachment: (taskId, file) => request(`/tasks/${taskId}/attachments`, {
+    method: 'POST',
+    raw: true,
+    body: file,
+    headers: {
+      'content-type': file.type || 'application/octet-stream',
+      'x-filename': encodeURIComponent(file.name),
+    },
+  }),
+  deleteAttachment: (id) => request(`/attachments/${id}`, { method: 'DELETE' }),
+  downloadUrl: (id) => `/api/attachments/${id}/download`,
 
   teams: (cycle) => request(`/teams${qs({ cycle })}`),
   createTeam: (b) => request('/teams', { method: 'POST', body: b }),

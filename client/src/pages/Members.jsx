@@ -78,7 +78,7 @@ export default function Members() {
 
 function MemberModal({ member, teams, users, onClose, onSaved }) {
   const [f, setF] = useState(member || {
-    name: '', email: '', password: '', role: 'member', designation: '',
+    name: '', email: '', role: 'member', designation: '',
     team_id: '', reports_to: '', active: 1,
   });
   const [error, setError] = useState('');
@@ -90,7 +90,6 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
     try {
       const body = { ...f, team_id: f.team_id || null };
       if (member?.id) {
-        if (!body.password) delete body.password;
         await api.updateUser(member.id, body);
       } else {
         await api.createUser(body);
@@ -100,7 +99,7 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
   };
 
   const deactivate = async () => {
-    if (!window.confirm(`Deactivate ${f.name}? They keep their history but can no longer sign in.`)) return;
+    if (!window.confirm(`Deactivate ${f.name}? They keep their history but drop off the sheet.`)) return;
     try { await api.deactivateUser(member.id); onSaved(); } catch (e) { setError(e.message); }
   };
 
@@ -110,7 +109,7 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
       <div style={{ flex: 1 }} />
       <button className="btn" onClick={onClose}>Cancel</button>
       <button className="btn primary" onClick={save}
-        disabled={busy || !f.name.trim() || !f.email.trim() || (!member && !f.password)}>
+        disabled={busy || !f.name.trim() || !f.email.trim()}>
         {busy ? 'Saving…' : 'Save member'}
       </button>
     </>}>
@@ -118,7 +117,7 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
 
       <div className="form-2">
         <Field label="Full name"><input value={f.name} onChange={set('name')} autoFocus /></Field>
-        <Field label="Email (used to sign in)"><input type="email" value={f.email} onChange={set('email')} /></Field>
+        <Field label="Email"><input type="email" value={f.email} onChange={set('email')} /></Field>
         <Field label="Designation">
           <input value={f.designation || ''} onChange={set('designation')} placeholder="Senior Technical Content Writer" />
         </Field>
@@ -126,14 +125,6 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
           <select value={f.team_id || ''} onChange={set('team_id')}>
             <option value="">No team</option>
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Access level"
-          hint="Only team members appear in this list — leads and stakeholders are hidden.">
-          <select value={f.role} onChange={set('role')}>
-            <option value="member">Team member</option>
-            <option value="lead">Marketing lead (full access)</option>
-            <option value="stakeholder">Stakeholder (read-only)</option>
           </select>
         </Field>
         <Field label="Reports to">
@@ -144,18 +135,12 @@ function MemberModal({ member, teams, users, onClose, onSaved }) {
         </Field>
       </div>
 
-      <Field label={member ? 'Reset password' : 'Password'}
-        hint={member ? 'Leave blank to keep the current password.' : 'At least 6 characters.'}>
-        <input type="text" value={f.password || ''} onChange={set('password')}
-          placeholder={member ? 'Unchanged' : 'Cloudfuze@123'} />
-      </Field>
-
       {member && !member.active && (
         <Field>
           <label className="row small" style={{ gap: 7 }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={!!f.active}
               onChange={(e) => setF((s) => ({ ...s, active: e.target.checked ? 1 : 0 }))} />
-            Reactivate this account
+            Reactivate this member
           </label>
         </Field>
       )}

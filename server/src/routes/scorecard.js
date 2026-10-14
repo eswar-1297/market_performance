@@ -96,6 +96,7 @@ r.get('/cycles', authenticate, async (req, res, next) => {
   try {
     const rows = await q(`
       SELECT DISTINCT cycle FROM scorecard_cells WHERE target <> '' OR achieved <> ''
+      UNION SELECT DISTINCT to_char(task_date, 'YYYY-MM') FROM daily_tasks
       UNION SELECT $1 AS cycle
       ORDER BY cycle DESC`, [currentCycle()]);
     return res.json(rows.map((x) => x.cycle));

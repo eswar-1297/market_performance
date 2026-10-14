@@ -4,9 +4,11 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initSchema, one } from './db.js';
+import { ensureSharedLogin } from './auth.js';
 import users from './routes/users.js';
 import teams from './routes/teams.js';
 import scorecard from './routes/scorecard.js';
+import tasks from './routes/tasks.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -22,6 +24,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 app.use('/api', users);
 app.use('/api', teams);
 app.use('/api', scorecard);
+app.use('/api', tasks);
 
 // Serve the built React app when it exists, so one process is enough.
 const clientDist = path.resolve(ROOT, '..', 'client', 'dist');
@@ -39,11 +42,12 @@ app.use((err, req, res, next) => {
 
 const start = async () => {
   await initSchema();
-  const { count } = await one('SELECT COUNT(*)::int AS count FROM users');
+  await ensureSharedLogin();
+  const { count } = await one(`SELECT COUNT(*)::int AS count FROM users WHERE active AND team_id IS NOT NULL`);
   app.listen(PORT, () => {
     console.log(`\n  Marketing Performance Tracker API  →  http://localhost:${PORT}`);
-    if (!count) console.log('  No users yet. Run:  npm run seed\n');
-    else console.log(`  ${count} user account(s) loaded.\n`);
+    if (!count) console.log('  No people on the sheet yet. Run:  npm run seed\n');
+    else console.log(`  ${count} people on the sheet.\n`);
   });
 };
 

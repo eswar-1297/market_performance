@@ -9,6 +9,7 @@
  */
 import bcrypt from 'bcryptjs';
 import { q, one, pool, initSchema, seedDefaultFields } from './db.js';
+import { SHARED_EMAIL, ensureSharedLogin } from './auth.js';
 
 const FORCE = process.argv.includes('--force');
 const DEFAULT_PASSWORD = 'Cloudfuze@123';
@@ -47,7 +48,8 @@ const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-
 async function main() {
   await initSchema();
 
-  const { count } = await one('SELECT COUNT(*)::int AS count FROM users');
+  // The shared login is made on boot, so it alone does not count as data.
+  const { count } = await one('SELECT COUNT(*)::int AS count FROM users WHERE lower(email) <> $1', [SHARED_EMAIL]);
   if (count > 0 && !FORCE) {
     console.log('Database already has data. Use "npm run reseed" to wipe and rebuild.');
     return;
@@ -55,10 +57,11 @@ async function main() {
 
   if (FORCE) {
     const { filled } = await one(
-      `SELECT COUNT(*)::int AS filled FROM scorecard_cells WHERE target <> '' OR achieved <> ''`,
+      `SELECT ((SELECT COUNT(*) FROM scorecard_cells WHERE target <> '' OR achieved <> '')
+            + (SELECT COUNT(*) FROM daily_tasks))::int AS filled`,
     );
     if (filled && !process.argv.includes('--wipe-sheet')) {
-      console.log(`\n  Refusing to reseed: the monthly sheet has ${filled} box(es) filled in,`);
+      console.log(`\n  Refusing to reseed: ${filled} sheet box(es) and daily task(s) are filled in,`);
       console.log('  and rebuilding the teams would delete them.\n');
       console.log('  Back the database up first, then, if you really mean it:');
       console.log('      node src/seed.js --force --wipe-sheet\n');
@@ -88,6 +91,7 @@ async function main() {
   }
 
   await seedDefaultFields();
+  await ensureSharedLogin();
 
   const counts = {};
   for (const t of ['teams', 'users', 'scorecard_fields']) {
@@ -100,11 +104,8 @@ async function main() {
   Members    : ${counts.users}
   Sheet cols : ${counts.scorecard_fields}
 
-  Sign in with any email below, password: ${DEFAULT_PASSWORD}
-
-    jyothi@cloudfuze.com        Marketing Manager (full access)
-    rahul@cloudfuze.com         Senior SEO & PPC Executive
-    stakeholder@cloudfuze.com   CEO / stakeholder (read-only)
+  Everyone signs in with ${SHARED_EMAIL}
+  (password Cloudfuze@123 unless SHARED_LOGIN_PASSWORD says otherwise).
 `);
 }
 
