@@ -388,7 +388,9 @@ input.cell.bad { background: var(--red-soft); border-color: #fecaca; }
 
 /* ---------------------------------------------------------- daily tasks */
 
-.taskform { display: grid; grid-template-columns: 170px 1fr; gap: 0 12px; }
+.taskform { display: grid; grid-template-columns: 170px 1fr 150px; gap: 0 12px; }
+.btn.status.done        { background: var(--green-soft); color: var(--green); border-color: #d1fae5; }
+.btn.status.in_progress { background: var(--amber-soft); color: var(--amber); border-color: #fde68a; }
 .tasklist { display: flex; flex-direction: column; gap: 10px; }
 .taskitem { padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .taskurl { color: var(--brand); font-weight: 600; font-size: 13px; text-decoration: none; word-break: break-all; }

@@ -13,7 +13,19 @@ const lastDay = (cycle) => {
 };
 const fmtDay = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined,
   { weekday: 'short', day: '2-digit', month: 'short' });
+const STATUS_LABEL = { in_progress: 'In progress', done: 'Done' };
+const doneCount = (list) => list.filter((t) => t.status === 'done').length;
 const shortUrl = (u) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+
+function StatusField({ value, onChange }) {
+  return (
+    <Field label="Status">
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+      </select>
+    </Field>
+  );
+}
 
 async function uploadAll(taskId, files) {
   const tooBig = [...files].find((f) => f.size > MAX_FILE);
@@ -109,6 +121,7 @@ function DailyLog({ people, cycle }) {
         {tasks && (
           <span className="faint small">
             {tasks.length} task{tasks.length === 1 ? '' : 's'} over {days.length} day{days.length === 1 ? '' : 's'}
+            {tasks.length > 0 && ` · ${doneCount(tasks)} done`}
           </span>
         )}
       </div>
@@ -128,7 +141,9 @@ function DailyLog({ people, cycle }) {
           <header>
             <h3>{fmtDay(day)}</h3>
             <div className="spacer" />
-            <span className="faint small">{list.length} task{list.length === 1 ? '' : 's'}</span>
+            <span className={`badge ${doneCount(list) === list.length ? 'green' : 'amber'}`}>
+              {doneCount(list)} of {list.length} done
+            </span>
           </header>
           <div className="body tasklist">
             {list.map((t) => (
@@ -145,7 +160,7 @@ function NewTask({ cycle, personId, onAdded, onError }) {
   const t = today();
   const first = `${cycle}-01`;
   const last = lastDay(cycle);
-  const [form, setForm] = useState({ task_date: t >= first && t <= last ? t : first, url: '', description: '' });
+  const [form, setForm] = useState({ task_date: t >= first && t <= last ? t : first, url: '', description: '', status: 'in_progress' });
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
@@ -159,7 +174,7 @@ function NewTask({ cycle, personId, onAdded, onError }) {
       const created = await api.createTask({ ...form, user_id: personId });
       try { await uploadAll(created.id, files); }
       catch (err) { onError(`Task saved, but a file did not upload: ${err.message}`); }
-      setForm({ ...form, url: '', description: '' });
+      setForm({ ...form, url: '', description: '', status: 'in_progress' });
       setFiles([]);
       onAdded();
     } catch (err) { onError(err.message); } finally { setBusy(false); }
@@ -178,6 +193,7 @@ function NewTask({ cycle, personId, onAdded, onError }) {
             <input placeholder="https://www.cloudfuze.com/…" value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })} />
           </Field>
+          <StatusField value={form.status} onChange={(status) => setForm({ ...form, status })} />
         </div>
         <Field label="Description">
           <textarea placeholder="What was done — published, updated, designed, sent…" value={form.description}
@@ -210,8 +226,16 @@ function TaskItem({ task, cycle, canEdit, onChanged, onError }) {
 
   const save = async () => {
     try {
-      await api.updateTask(task.id, { task_date: form.task_date, url: form.url, description: form.description });
+      await api.updateTask(task.id,
+        { task_date: form.task_date, url: form.url, description: form.description, status: form.status });
       setEditing(false);
+      onChanged();
+    } catch (e) { onError(e.message); }
+  };
+
+  const toggleStatus = async () => {
+    try {
+      await api.updateTask(task.id, { status: task.status === 'done' ? 'in_progress' : 'done' });
       onChanged();
     } catch (e) { onError(e.message); }
   };
@@ -232,6 +256,7 @@ function TaskItem({ task, cycle, canEdit, onChanged, onError }) {
           <Field label="URL">
             <input value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
           </Field>
+          <StatusField value={form.status} onChange={(status) => setForm({ ...form, status })} />
         </div>
         <Field label="Description">
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -256,6 +281,14 @@ function TaskItem({ task, cycle, canEdit, onChanged, onError }) {
           )}
           {task.description && <div className="taskdesc">{task.description}</div>}
         </div>
+        {canEdit ? (
+          <button className={`btn sm status ${task.status}`} onClick={toggleStatus}
+            title={task.status === 'done' ? 'Mark as in progress' : 'Mark as done'}>
+            {task.status === 'done' ? '✓ Done' : '◷ In progress'}
+          </button>
+        ) : (
+          <span className={`badge ${task.status === 'done' ? 'green' : 'amber'}`}>{STATUS_LABEL[task.status]}</span>
+        )}
         <button className="btn sm" onClick={() => setShowFiles(!showFiles)}>
           📎 {n || (canEdit ? 'Attach' : 0)}
         </button>
@@ -310,6 +343,7 @@ function Summary({ people, cycle }) {
           ...p,
           tasks: mine,
           days: new Set(mine.map((t) => t.task_date)).size,
+          done: doneCount(mine),
           urls: mine.filter((t) => t.url).length,
           files: mine.reduce((n, t) => n + t.attachments.length, 0),
           last: mine.length ? mine[mine.length - 1].task_date : null,
@@ -336,6 +370,8 @@ function Summary({ people, cycle }) {
         <div className="tile"><div className="v">{logged}<span className="faint" style={{ fontSize: 18 }}> / {rows.length}</span></div>
           <div className="l">People who logged work</div></div>
         <div className="tile"><div className="v">{total('tasks')}</div><div className="l">Tasks</div></div>
+        <div className="tile"><div className="v">{total('done')}<span className="faint" style={{ fontSize: 18 }}> / {total('tasks')}</span></div>
+          <div className="l">Tasks done</div></div>
         <div className="tile"><div className="v">{total('urls')}</div><div className="l">URLs</div></div>
         <div className="tile"><div className="v">{total('files')}</div><div className="l">Attachments</div></div>
       </div>
@@ -363,7 +399,7 @@ function Summary({ people, cycle }) {
             <thead>
               <tr>
                 <th>Person</th><th className="nowrap">Days logged</th><th className="nowrap">Tasks</th>
-                <th className="nowrap">URLs</th><th className="nowrap">Attachments</th><th className="nowrap">Last entry</th>
+                <th className="nowrap">Done</th>                <th className="nowrap">URLs</th><th className="nowrap">Attachments</th><th className="nowrap">Last entry</th>
               </tr>
             </thead>
             <tbody>
@@ -382,18 +418,23 @@ function Summary({ people, cycle }) {
                     <td className="nowrap">{r.days || <span className="faint">—</span>}</td>
                     <td className="nowrap">{r.tasks.length
                       ? <b>{r.tasks.length}</b> : <span className="badge amber">Nothing logged</span>}</td>
+                    <td className="nowrap">{r.tasks.length
+                      ? `${r.done} of ${r.tasks.length}` : <span className="faint">—</span>}</td>
                     <td className="nowrap">{r.urls || <span className="faint">—</span>}</td>
                     <td className="nowrap">{r.files || <span className="faint">—</span>}</td>
                     <td className="nowrap small">{r.last ? fmtDay(r.last) : <span className="faint">—</span>}</td>
                   </tr>
                   {open.has(r.id) && (
                     <tr className="expanded">
-                      <td colSpan={6}>
+                      <td colSpan={7}>
                         <table className="worklist">
                           <tbody>
                             {r.tasks.map((t) => (
                               <tr key={t.id}>
                                 <td className="nowrap small muted" style={{ width: 110 }}>{fmtDay(t.task_date)}</td>
+                                <td className="nowrap" style={{ width: 100 }}>
+                                  <span className={`badge ${t.status === 'done' ? 'green' : 'amber'}`}>{STATUS_LABEL[t.status]}</span>
+                                </td>
                                 <td style={{ width: '34%' }}>
                                   {t.url
                                     ? <a href={t.url} target="_blank" rel="noreferrer" className="taskurl">{shortUrl(t.url)}</a>

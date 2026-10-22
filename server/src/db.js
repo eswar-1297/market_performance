@@ -131,6 +131,9 @@ CREATE TABLE IF NOT EXISTS daily_tasks (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Whether the piece of work got finished that day: 'in_progress' or 'done'.
+ALTER TABLE daily_tasks ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'in_progress';
+
 -- Files kept in the database itself, so they survive a hosted restart that
 -- would wipe the server's disk.
 CREATE TABLE IF NOT EXISTS task_attachments (

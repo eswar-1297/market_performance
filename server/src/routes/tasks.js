@@ -7,6 +7,7 @@ const r = Router();
 const MAX_FILE = 10 * 1024 * 1024;
 const currentCycle = () => new Date().toISOString().slice(0, 7);
 const isCycle = (c) => /^\d{4}-\d{2}$/.test(String(c || ''));
+const STATUSES = ['in_progress', 'done'];
 const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && !Number.isNaN(Date.parse(d));
 
 /** Bare "cloudfuze.com/blog/x" becomes a link that opens; anything else is refused. */
@@ -23,7 +24,7 @@ function cleanUrl(raw) {
 // DATE comes back as text so a day never slides across a timezone boundary.
 const SELECT_TASKS = `
   SELECT t.id, t.user_id, to_char(t.task_date, 'YYYY-MM-DD') AS task_date, t.url, t.description,
-         t.created_at, t.updated_at, u.name AS user_name, u.team_id,
+         t.status, t.created_at, t.updated_at, u.name AS user_name, u.team_id,
          tm.name AS team_name, tm.colour AS team_colour
   FROM daily_tasks t
   JOIN users u ON u.id = t.user_id
@@ -84,11 +85,13 @@ r.post('/tasks', authenticate, requireWriter, async (req, res, next) => {
     if (url === null) return res.status(400).json({ error: 'That URL does not look like a web link' });
     const description = String(req.body.description ?? '').trim();
     if (!url && !description) return res.status(400).json({ error: 'Add a URL or a description' });
+    const status = req.body.status ?? 'in_progress';
+    if (!STATUSES.includes(status)) return res.status(400).json({ error: 'Status must be in progress or done' });
 
     const created = await one(
-      `INSERT INTO daily_tasks (user_id, task_date, url, description, created_by)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [userId, task_date, url, description, req.user.id],
+      `INSERT INTO daily_tasks (user_id, task_date, url, description, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [userId, task_date, url, description, status, req.user.id],
     );
     await logActivity({ user_id: req.user.id, action: 'task.created', detail: `${person.name} · ${task_date}` });
     const [task] = await withAttachments(await q(`${SELECT_TASKS} WHERE t.id = $1`, [created.id]));
@@ -110,12 +113,14 @@ r.put('/tasks/:id', authenticate, requireWriter, async (req, res, next) => {
     if (url === null) return res.status(400).json({ error: 'That URL does not look like a web link' });
     const description = req.body.description != null ? String(req.body.description).trim() : t.description;
     if (!url && !description) return res.status(400).json({ error: 'Add a URL or a description' });
+    const status = req.body.status ?? t.status;
+    if (!STATUSES.includes(status)) return res.status(400).json({ error: 'Status must be in progress or done' });
 
     // Without a new date, the stored one is kept as-is rather than round-tripped.
     await q(
       `UPDATE daily_tasks SET task_date = COALESCE($1::date, task_date), url = $2, description = $3,
-              updated_at = now() WHERE id = $4`,
-      [taskDate, url, description, t.id],
+              status = $4, updated_at = now() WHERE id = $5`,
+      [taskDate, url, description, status, t.id],
     );
     const [task] = await withAttachments(await q(`${SELECT_TASKS} WHERE t.id = $1`, [t.id]));
     return res.json(task);
@@ -194,9 +199,10 @@ r.get('/export/tasks.csv', authenticate, async (req, res, next) => {
        ORDER BY tm.sort_order NULLS LAST, u.name, t.task_date, t.id`, [cycle],
     ));
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [['Team', 'Name', 'Date', 'URL', 'Description', 'Attachments'].map(esc).join(',')];
+    const lines = [['Team', 'Name', 'Date', 'Status', 'URL', 'Description', 'Attachments'].map(esc).join(',')];
     for (const t of tasks) {
-      lines.push([t.team_name, t.user_name, t.task_date, t.url, t.description,
+      lines.push([t.team_name, t.user_name, t.task_date,
+        t.status === 'done' ? 'Done' : 'In progress', t.url, t.description,
         t.attachments.map((a) => a.original_name).join('; ')].map(esc).join(','));
     }
     res.setHeader('content-type', 'text/csv; charset=utf-8');
